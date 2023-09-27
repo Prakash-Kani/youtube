@@ -1,3 +1,4 @@
+# hi this is comment line
 import streamlit as st
 from googleapiclient.discovery import build
 import pandas as pd
@@ -327,7 +328,7 @@ if inp == 'Select Operation':
     st.markdown("""Welcome to our **YouTube Data Harvesting and Warehousing** application. Here, you can seamlessly fetch YouTube channel data, 
                 explore comprehensive channel details, and migrate data to a MYSQL warehouse. Whether you need to retrieve specific channel 
                 information or perform custom MYSQL queries, our app offers versatile tools to help you extract insights and make data-driven decisions.""")
-    st.subheader(":green[Use the options below to interact with your data]")
+    st.subheader(":green[Use the side options below to interact with your data]")
     st.markdown("""  - **Fetch Channel Data:** Retrieve information about YouTube channels.
                 \n  - **View Channel Details:** Explore detailed channel information.
                 \n  - **Migrate Data to MYSQL Warehouse:** Transfer data to your MySQL data warehouse.
