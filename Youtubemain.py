@@ -29,11 +29,6 @@ api_key = os.getenv("API_KEY")
 
 youtube = build(api_service_name, api_version, developerKey=api_key)
 
-# youtube
-# # api key connection
-# # api_key = 'AIzaSyB15RjjY5se4QEsyMFRO2Vbyg-m0ugm09Q'
-# api_key='AIzaSyBP4vu65zGIPeikv03LPOJzRNQtdpRaMB0'
-# youtube = build('youtube', 'v3', developerKey=api_key)
 
 # The get_channelId function retrieves the channelId associated with a given channel name.
 def get_channelId(name):
