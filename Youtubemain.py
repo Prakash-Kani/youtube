@@ -1,4 +1,3 @@
-# hi this is comment line
 import streamlit as st
 from googleapiclient.discovery import build
 import pandas as pd
@@ -9,6 +8,11 @@ from datetime import datetime as dt
 import time
 import matplotlib.pyplot as plt
 import mysql.connector
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 st.set_page_config(page_title = "YouTube Data Harvesting Hub",
                    page_icon = "https://cdn.emojidex.com/emoji/seal/youtube.png",
@@ -19,10 +23,17 @@ st.set_page_config(page_title = "YouTube Data Harvesting Hub",
 st.title(":red[YouTube Data] :blue[Harvesting] and :orange[Warehousing]")#📡
 st.subheader('Using :green[Python, MongoDB,SQL and Streamlit]', divider='rainbow')
 
-# api key connection
-# api_key = 'AIzaSyB15RjjY5se4QEsyMFRO2Vbyg-m0ugm09Q'
-api_key='AIzaSyBP4vu65zGIPeikv03LPOJzRNQtdpRaMB0'
-youtube = build('youtube', 'v3', developerKey=api_key)
+api_service_name = os.getenv("API_SERVICE_NAME")
+api_version = os.getenv("V3")
+api_key = os.getenv("API_KEY")
+
+youtube = build(api_service_name, api_version, developerKey=api_key)
+
+# youtube
+# # api key connection
+# # api_key = 'AIzaSyB15RjjY5se4QEsyMFRO2Vbyg-m0ugm09Q'
+# api_key='AIzaSyBP4vu65zGIPeikv03LPOJzRNQtdpRaMB0'
+# youtube = build('youtube', 'v3', developerKey=api_key)
 
 # The get_channelId function retrieves the channelId associated with a given channel name.
 def get_channelId(name):
@@ -52,11 +63,11 @@ class get_alldetails:
                                  ChannelId = response['items'][0]['id'],
                                  PlayListId = response['items'][0]['contentDetails']['relatedPlaylists'].get("uploads"),
                                  Description = response['items'][0]['snippet'].get('description'),
-                                 Country = response['items'][0]['snippet'].get("country"),
-                                 Views = response['items'][0]['statistics'].get('viewCount'),
-                                 Subscriber = response['items'][0]['statistics'].get('subscriberCount'),
+                                 Country = response['items'][0]['snippet'].get("country", ''),
+                                 Views = response['items'][0]['statistics'].get('viewCount', 0),
+                                 Subscriber = response['items'][0]['statistics'].get('subscriberCount', 0),
                                  PublishedAt = response['items'][0]['snippet'].get("publishedAt"),
-                                 VideoCount = response['items'][0]['statistics'].get('videoCount'))
+                                 VideoCount = response['items'][0]['statistics'].get('videoCount', 0))
 
         return self.channel_data
     
@@ -105,19 +116,19 @@ class get_alldetails:
                 videodata = dict(VideoTitle = response['items'][0]['snippet'].get('title'),
                                  VideoId = response['items'][0]['id'],
                                  PublishedAt = response['items'][0]['snippet'].get("publishedAt"),
-                                 VideoDescription = response['items'][0]['snippet'].get('description'),
+                                 VideoDescription = response['items'][0]['snippet'].get('description', ''),
                                  Thumbnails = response['items'][0]['snippet']['thumbnails']['default'].get('url'),
                                  CategoryId = response['items'][0]['snippet'].get("categoryId"),
                                  Caption = response['items'][0]["contentDetails"].get('caption'),
-                                 Dimension = response['items'][0]["contentDetails"].get('dimension'),
-                                 Definition = response['items'][0]["contentDetails"].get('definition'),
-                                 Tags = ' '.join(response['items'][0]['snippet'].get('tags','')),
-                                 Views = response['items'][0]['statistics'].get('viewCount'),
-                                 LikeCount = response['items'][0]['statistics'].get('likeCount'),
-                                 DislikeCount = response['items'][0]['statistics'].get('dislikeCount',0),
+                                 Dimension = response['items'][0]["contentDetails"].get('dimension', ''),
+                                 Definition = response['items'][0]["contentDetails"].get('definition',''),
+                                 Tags = ' '.join(response['items'][0]['snippet'].get('tags', ' ')),
+                                 Views = response['items'][0]['statistics'].get('viewCount', 0),
+                                 LikeCount = response['items'][0]['statistics'].get('likeCount', 0),
+                                 DislikeCount = response['items'][0]['statistics'].get('dislikeCount', 0),
                                  Duration = duration1,
-                                 FavoriteCount = response['items'][0]['statistics'].get("favoriteCount"),
-                                 CommentCount = response['items'][0]['statistics'].get('commentCount'))
+                                 FavoriteCount = response['items'][0]['statistics'].get("favoriteCount", 0),
+                                 CommentCount = response['items'][0]['statistics'].get('commentCount', 0))
                 self.video_data.append(videodata)
 
         return self.video_data
@@ -144,10 +155,10 @@ class get_alldetails:
                                   AuthorDisplayName = response['items'][i]['snippet']['topLevelComment']['snippet'].get('authorDisplayName'),
                                   CommentId = response['items'][i]['snippet']['topLevelComment'].get('id'),
                                   PublishedAt = response['items'][i]['snippet']['topLevelComment']['snippet'].get('publishedAt'),
-                                  LikeCount = response['items'][i]['snippet']['topLevelComment']['snippet'].get('likeCount'),
+                                  LikeCount = response['items'][i]['snippet']['topLevelComment']['snippet'].get('likeCount', 0),
                                   DislikeCount = response['items'][i]['snippet']['topLevelComment']['snippet'].get('dislikeCount',0),
                                   Text = response['items'][i]['snippet']['topLevelComment']['snippet'].get('textOriginal'),
-                                  TotalReplyCount = response['items'][i]['snippet'].get('totalReplyCount'))
+                                  TotalReplyCount = response['items'][i]['snippet'].get('totalReplyCount', 0))
 
                         self.comment_details.append(data)
 
@@ -316,8 +327,8 @@ def mergemysql(query):
 
 
 st.sidebar.title(":red[YouTube Data Hub]")
-image_path = "https://cdn.emojidex.com/emoji/seal/youtubelogo.png"
-st.sidebar.image(image_path, use_column_width=True)
+# image_path = "https://cdn.emojidex.com/emoji/seal/youtubelogo.png"
+# st.sidebar.image(image_path, use_column_width=True)
 inp = st.sidebar.selectbox("**Data Operations**", ["Select Operation", 'Fetch Channel Data', 'View Channel Details', 'Migrate Data to MYSQL Warehouse',
                                    'MYSQL Query Results', 'Direct MySQL Query', 'Feedback'])
 st.sidebar.markdown(""":blue[Welcome to the ***YouTube Data Hub*** an all-in-one solution for harvesting, storing, and analyzing YouTube data. 
@@ -325,29 +336,25 @@ st.sidebar.markdown(""":blue[Welcome to the ***YouTube Data Hub*** an all-in-one
 
 if inp == 'Select Operation':
     st.title(":blue[***Welcome to Your YouTube Data Hub***]")
-    st.markdown("""Welcome to our **YouTube Data Harvesting and Warehousing** application. Here, you can seamlessly fetch YouTube channel data, 
+    st.markdown("""Welcome to our **YouTube Data Harvesting** application. Here, you can seamlessly fetch YouTube channel data, 
                 explore comprehensive channel details, and migrate data to a MYSQL warehouse. Whether you need to retrieve specific channel 
                 information or perform custom MYSQL queries, our app offers versatile tools to help you extract insights and make data-driven decisions.""")
-    st.subheader(":green[Use the side options below to interact with your data]")
-    st.markdown("""  - **Fetch Channel Data:** Retrieve information about YouTube channels.
-                \n  - **View Channel Details:** Explore detailed channel information.
-                \n  - **Migrate Data to MYSQL Warehouse:** Transfer data to your MySQL data warehouse.
-                \n  - **MYSQL Query Results:** Perform SQL queries and view results.
-                \n  - **Direct MySQL Query:** Write and execute custom MySQL queries.
+    st.subheader(":green[Use the options below to interact with your data]")
+    st.markdown("""- **Fetch Channel Data:** Retrieve information about YouTube channels.
+                \n- **View Channel Details:** Explore detailed channel information.
+                \n- **Migrate Data to MYSQL Warehouse:** Transfer data to your MySQL data warehouse.
+                \n- **MYSQL Query Results:** Perform SQL queries and view results.
+                \n- **Direct MySQL Query:** Write and execute custom MySQL queries.
                                 
                 \n***Please select an operation and get started with your data analysis journey!***""")
 elif inp == 'Fetch Channel Data':
     name = st.text_input('**Enter the Channel Name**')
     execute = st.button("Get Channel Details")
-    sample = st.button("Get Channelstatus Details")
     if execute == False:
         st.header(':blue[***Fetch Channel Data***]')
         st.markdown("""With this option, users can input the YouTube channel name and initiate the data retrieval process by clicking 
                     the **"Get Channel Details"** button. The app will fetch and store comprehensive data, including channel information,
                     video IDs, video details, and comments associated with the channel's videos, all neatly organized in the MongoDB database.""")
-    elif name and sample:
-        st.write('hi',name)
-    
     elif name and execute:
         with st.spinner('Please wait '):
                 data1=mongo(name)
@@ -358,30 +365,35 @@ elif inp == 'View Channel Details':
     channelname = st.selectbox('select ChannelName', [i['channeldata']['ChannelName'] for i in col.find()])
     if channelname:
         query = {'channeldata.ChannelName':channelname}
-        for i in col.find(query):
-            tab1, tab2, tab3, tab4, tab5 = st.tabs(['View Channel Details', 'ChannelDetails', 'VideoIdDetails', 'VideoDetails', 'CommentDetails'])
-            with tab1:
-                st.header(':blue[***View Channel Details***]')
-                st.markdown("""     This option enables users to explore comprehensive YouTube channel information stored in the MongoDB database.
-                                Users can input the YouTube channel name, and the app will retrieve and display details including **channel information,
-                                video IDs, video details, and comments associated with that channel's videos**. Dive deep into the channel's content with ease.""")
-            with tab2:
-                st.header(':blue[Channel Details]')
-                df5 = pd.DataFrame([i['channeldata'] for i in col.find(query)])
-                st.table(df5.head(100))
-            with tab3:
-                st.header(':blue[Video Id Details]')
+        tab1, tab2, tab3, tab4, tab5 = st.tabs(['View Channel Details', 'ChannelDetails', 'VideoIdDetails', 'VideoDetails', 'CommentDetails'])
+        with tab1:
+            st.header(':blue[***View Channel Details***]')
+            st.markdown("""This option enables users to explore comprehensive YouTube channel information stored in the MongoDB database.
+                            Users can input the YouTube channel name, and the app will retrieve and display details including **channel information,
+                            video IDs, video details, and comments associated with that channel's videos**. Dive deep into the channel's content with ease.""")
+        with tab2:
+            st.header(':blue[Channel Details]')
+            for i in col.find(query):
+                st.dataframe(i['channeldata'])
+        with tab3:
+            st.header(':blue[Video Id Details]')
+            for i in col.find(query):
                 df6 = pd.DataFrame(i['videoiddata'])
-                st.table(df6.head(100))
-            with tab4:
-                st.header(':blue[Video Details]')
+            st.dataframe(df6.head(100))
+        with tab4:
+            st.header(':blue[Video Details]')
+            for i in col.find(query):
                 df7 = pd.DataFrame(i['videodata'])
-                st.table(df7.head(500))
-            with tab5:
-                st.header(':blue[Comment Details]')
+            st.dataframe(df7.head(500))
+        with tab5:
+            st.header(':blue[Comment Details]')
+            for i in col.find(query):
                 df8 = pd.DataFrame(i['commentdata'])
-                st.table(df8.head(1000))
+            st.dataframe(df8.head(1000))
 
+
+
+ 
 elif inp == 'Migrate Data to MYSQL Warehouse':
     mode = st.selectbox('Select the Method of Migration',["Select the Mode of Migration", "Default Migration", "Selective Migration"])
     if mode == 'Select the Mode of Migration':
@@ -408,7 +420,6 @@ elif inp == 'Migrate Data to MYSQL Warehouse':
     elif sql:
         with st.spinner('Please wait '):
             merge = mergemysql(query)
-            # st.write(merge)
             st.success('Done!, Data Migration Successfully')
 
 elif inp == 'MYSQL Query Results':
@@ -438,14 +449,14 @@ elif inp == 'MYSQL Query Results':
                         ON videodetails.VideoId=playlistiddetails.VideoId;""")
         data = curs.fetchall()
         df = pd.DataFrame(data, columns = [i[0] for i in curs.description])
-        st.table(df)
+        st.dataframe(df)
     elif question == '2. Which channels have the most number of videos, and how many videos do they have?':
         st.write(question)
         curs.execute("""select ChannelName, VideoCount from ChannelDetails
                         where VideoCount=(select max(VideoCount)from ChannelDetails);""")
         data = curs.fetchall()
         df1 = pd.DataFrame(data, columns = [i[0] for i in curs.description])
-        st.table(df1)
+        st.dataframe(df1)
     elif question == '3. What are the top 10 most viewed videos and their respective channels?':
         st.write(question)
         curs.execute("""select channeldetails.ChannelName, video.VideoTitle, video.Views from channeldetails INNER JOIN
@@ -455,13 +466,13 @@ elif inp == 'MYSQL Query Results':
 
         data = curs.fetchall()
         df3 = pd.DataFrame(data, columns = [i[0] for i in curs.description])
-        st.table(df3)
+        st.dataframe(df3)
     elif question == '4. How many comments were made on each video, and what are their corresponding video names?':
         st.write(question)
         curs.execute("""select VideoTitle, Views, CommentCount from videodetails ORDER BY Views desc;""")
         data = curs.fetchall()
         df4 = pd.DataFrame(data, columns = [i[0] for i in curs.description])
-        st.table(df4)
+        st.dataframe(df4)
 
     elif question == '5. Which videos have the highest number of likes, and what are their corresponding channel names?':
         st.write(question)
@@ -471,13 +482,13 @@ elif inp == 'MYSQL Query Results':
                         video.VideoId=playlistiddetails.VideoId;""")
         data = curs.fetchall()
         df5 = pd.DataFrame(data, columns = [i[0] for i in curs.description])
-        st.table(df5)
+        st.dataframe(df5)
     elif question == '6. What is the total number of likes and dislikes for each video, and what are their corresponding video names?':
         st.write(question)
         curs.execute("""SELECT VideoTitle, LikeCount, DislikeCount FROM videodetails;""")
         data = curs.fetchall()
         df6 = pd.DataFrame(data, columns = [i[0] for i in curs.description])
-        st.table(df6)
+        st.dataframe(df6)
     elif question == '7. What is the total number of views for each channel, and what are their corresponding channel names?':
         st.write(question)
         curs.execute("""select channeldetails.ChannelName, sum(videodetails.Views) as TotalViews from channeldetails inner join 
@@ -486,7 +497,7 @@ elif inp == 'MYSQL Query Results':
         data = curs.fetchall()
         df7 = pd.DataFrame(data, columns = [i[0] for i in curs.description])
         df7['TotalViews'] = df7['TotalViews'].astype(int)
-        st.write(df7)
+        st.dataframe(df7)
 
         # st.bar_chart(df7,x='ChannelName' , y='TotalViews') 
     elif question == '8. What are the names of all the channels that have published videos in the year 2022?':
@@ -496,7 +507,7 @@ elif inp == 'MYSQL Query Results':
                         WHERE YEAR(videodetails.PublishedAt) = 2022;""")
         data = curs.fetchall()
         df8 = pd.DataFrame(data, columns=[i[0] for i in curs.description])
-        st.table(df8)
+        st.dataframe(df8)
     elif question == '9. What is the average duration of all videos in each channel, and what are their corresponding channel names?':
         st.write(question) 
         curs.execute("""select channeldetails.ChannelName, AVG(videodetails.Duration) as AverageDuration from channeldetails inner join
@@ -504,7 +515,7 @@ elif inp == 'MYSQL Query Results':
                         on videodetails.VideoId=playlistiddetails.VideoId group by channeldetails.ChannelName;""")
         data = curs.fetchall()
         df9 = pd.DataFrame(data, columns = [i[0] for i in curs.description])
-        st.table(df9)   
+        st.dataframe(df9)   
         st.bar_chart(df9,x='ChannelName' , y='AverageDuration') 
     elif question == '10. Which videos have the highest number of comments, and what are their corresponding channel names?':
         st.write(question)
@@ -514,7 +525,7 @@ elif inp == 'MYSQL Query Results':
                         videodetails)) video ON video.VideoId=playlistiddetails.VideoId;""")
         data = curs.fetchall()
         df10 = pd.DataFrame(data, columns = [i[0] for i in curs.description])
-        st.table(df10) 
+        st.dataframe(df10) 
 
 elif inp == 'Direct MySQL Query':
     query = st.text_area('**Enter your own query**')
@@ -536,19 +547,19 @@ elif inp == 'Direct MySQL Query':
             with tab1:
                 st.header(':blue[ChannelDetails]')
                 data1 = [i[0] for i in data1]
-                st.table(pd.DataFrame(data1, columns = ['Column Name']))  
+                st.dataframe(pd.DataFrame(data1, columns = ['Column Name']))  
             with tab2:
                 st.header(':blue[PlayListIdDetails]')
                 data2 = [i[0] for i in data2]
-                st.table(pd.DataFrame(data2, columns = ['Column Name']))
+                st.dataframe(pd.DataFrame(data2, columns = ['Column Name']))
             with tab3:
                 st.header(':blue[VideoDetails]')
                 data3 = [i[0] for i in data3]
-                st.table(pd.DataFrame(data3, columns = ['Column Name']))
+                st.dataframe(pd.DataFrame(data3, columns = ['Column Name']))
             with tab4:
                 st.header(':blue[CommentDetails]')
                 data4 = [i[0] for i in data4]
-                st.table(pd.DataFrame(data4, columns = ['Column Name']))
+                st.dataframe(pd.DataFrame(data4, columns = ['Column Name']))
 
         st.header(':blue[***Direct MySQL Query***]')
         st.markdown("""Empower your data exploration with direct MySQL queries. Craft your own SQL queries for analysis and insights.
