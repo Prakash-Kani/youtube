@@ -23,12 +23,25 @@ st.set_page_config(page_title = "YouTube Data Harvesting Hub",
 st.title(":red[YouTube Data] :blue[Harvesting] and :orange[Warehousing]")#📡
 st.subheader('Using :green[Python, MongoDB,SQL and Streamlit]', divider='rainbow')
 
+# Youtube developer console api Connection
 api_service_name = os.getenv("API_SERVICE_NAME")
 api_version = os.getenv("V3")
 api_key = os.getenv("API_KEY")
 
 youtube = build(api_service_name, api_version, developerKey=api_key)
 
+# MongoDB Connection
+cloud_client = mc("mongodb+srv://prakashkoffi:1234567890@cluster0.2owrgpr.mongodb.net/?retryWrites=true&w=majority")
+# loc = mc('mongodb://localhost:27017')
+database = cloud_client['YouTube']
+collection = database['YouTube']
+
+# MYSQL Connection
+db = mysql.connector.connect(host = 'localhost',
+                           user = 'root',
+                           password = 'Prakashk14',
+                           database = 'youtube')
+mycursor = db.cursor(buffered = True)
 
 # The get_channelId function retrieves the channelId associated with a given channel name.
 def get_channelId(name):
@@ -41,11 +54,13 @@ def get_channelId(name):
     channelId = response['items'][0]['snippet']['channelId']
     return channelId
 
+# get_alldetails main class retrieve the channel details, videoid details, video details and the comment details associated with a given channel name.
 class get_alldetails:
     def __init__(self, youtube, name):
         self.channelId = get_channelId(name)
         self.youtube = youtube
-        
+    
+    # getchanneldetails fuction retrieves the channel details associated with a given channel id.
     def getchanneldetails(self):
         request = self.youtube.channels().list(
                     part = 'snippet, contentDetails, statistics',
@@ -66,6 +81,7 @@ class get_alldetails:
 
         return self.channel_data
     
+    # The "getvideoid" function returns all video ID linked to the specified playlist id.
     def getvideoid(self):
         
         self.playlistid = self.channel_data.get('PlayListId')
@@ -90,7 +106,7 @@ class get_alldetails:
 
         return self.video_id
     
-
+     # The getvideodetails function returns the video information related to a particular video id.
     def getvideodetails(self):
         
         self.video_data = []
@@ -128,6 +144,7 @@ class get_alldetails:
 
         return self.video_data
     
+     # The function getcommentdetails collects the comment information related to a particular video id. Handling of exceptions for videos with disabled comments.
     def getcommentdetails(self):
 
         self.comment_details = []
@@ -166,6 +183,7 @@ class get_alldetails:
                 pass
         return self.comment_details
 
+# The get_all function allows you to get all channel data through the main class associated with the channel name.
 def get_all(name):
     channel = get_alldetails(youtube, name)
     alldetails = {'channeldata': channel.getchanneldetails(),
@@ -174,23 +192,17 @@ def get_all(name):
                   'commentdata': channel.getcommentdetails()}
     return alldetails  
 
-# MongoDB
-loc = mc("mongodb+srv://prakashkoffi:1234567890@cluster0.2owrgpr.mongodb.net/?retryWrites=true&w=majority")
-# loc = mc('mongodb://localhost:27017')
-dbnew = loc['YouTube']
-col = dbnew['YouTube']
-
-
-def mongo(name):
+# The push_mongodb function inserts channel data from the channel name input into mongoDB.
+def push_mongoDB(name):
     data = get_all(name)
-    col.insert_one(data)
+    collection.insert_one(data)
     return 'datas are inserted collection is YouTube!'
 
-# Data Cleaning
+# For a certain query, the dataclean function retrieves the relevant mongoDB data and separates the channel information, video id details, video details, and comment details. After that, data cleaning took place.
 def dataclean(query):
     channeldetails, playlistid, videodetails, commentdetails = [], [], [], []
 
-    for i in col.find(query,{'_id':0}):
+    for i in collection.find(query,{'_id':0}):
         channeldetails.append(i['channeldata'])
         playlistid.extend(i['videoiddata'])
         videodetails.extend(i['videodata'])
@@ -222,8 +234,7 @@ def dataclean(query):
     return(channel, play,video, comment)
 
 
-
-# Direct insert 
+#code for Direct insert 
 
 # from sqlalchemy import create_engine
 # engine = create_engine("mysql+mysqlconnector://root:Prakashk14@localhost/youtube")
@@ -234,19 +245,13 @@ def dataclean(query):
 # video.to_sql('videodetails', if_exists = 'append', index = False, con = engine)
 
 
-db = mysql.connector.connect(host = 'localhost',
-                           user = 'root',
-                           password = 'Prakashk14',
-                           database = 'youtube')
-curs = db.cursor(buffered = True)
-
-# merge into sql
-def mergemysql(query):
+# migrate mongoDB data into MYSQL database. It is possible to migrate MongoDB channel details without creating duplicate values in MySQL.
+def migrate_to_mysql(query):
     channel, play, video, comment = dataclean(query)
 
     #channeldetails
-    curs.execute("select ChannelId from channeldetails")
-    data5 = curs.fetchall()
+    mycursor.execute("select ChannelId from channeldetails")
+    data5 = mycursor.fetchall()
     storedchannel = [i[0] for i in data5]
 
     data1 = channel['ChannelId'].tolist()
@@ -260,12 +265,12 @@ def mergemysql(query):
                            newchannel['PublishedAt'], newchannel['VideoCount']))
     sql1 = "INSERT INTO channeldetails VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
 
-    curs.executemany(sql1, newchannelrow)
+    mycursor.executemany(sql1, newchannelrow)
     db.commit()
 
     #play list id 
-    curs.execute("select PlayListId from playlistiddetails")
-    data6 = curs.fetchall()
+    mycursor.execute("select PlayListId from playlistiddetails")
+    data6 = mycursor.fetchall()
     storedplay = [i[0] for i in data6]
 
     data2 = play['PlayListId'].tolist()
@@ -275,12 +280,12 @@ def mergemysql(query):
     newplay = play[filter2]
     newplayrows = list(zip(newplay['VideoId'], newplay['PlayListId']))
     sql2 = "INSERT INTO playlistiddetails VALUES (%s, %s)"
-    curs.executemany(sql2, newplayrows)
+    mycursor.executemany(sql2, newplayrows)
     db.commit()
 
     #video Details 
-    curs.execute("select VideoId from videodetails")
-    data7 = curs.fetchall()
+    mycursor.execute("select VideoId from videodetails")
+    data7 = mycursor.fetchall()
     storedvideo = [i[0] for i in data7]
 
     data3 = video['VideoId'].tolist()
@@ -295,14 +300,13 @@ def mergemysql(query):
                           newvideo['DislikeCount'], newvideo['Duration'], newvideo['FavoriteCount'], newvideo['CommentCount']))
 
     sql3 = "INSERT INTO videodetails VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
-    curs.executemany(sql3,newvideorows)
+    mycursor.executemany(sql3,newvideorows)
     db.commit()
 
     #comment Details
-    curs.execute("select VideoId from commentdetails")
-    data8 = curs.fetchall()
+    mycursor.execute("select VideoId from commentdetails")
+    data8 = mycursor.fetchall()
     storedcomment = [i[0] for i in data8]
-
   
     data4 = comment['VideoId'].tolist()
 
@@ -316,19 +320,17 @@ def mergemysql(query):
 
     sql4 = "INSERT INTO commentdetails VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
 
-    curs.executemany(sql4,newcommentrows)
+    mycursor.executemany(sql4,newcommentrows)
     db.commit()
     return 'data inserted done!'
 
-
+# Streamlit webapp
 st.sidebar.title(":red[YouTube Data Hub]")
-# image_path = "https://cdn.emojidex.com/emoji/seal/youtubelogo.png"
-# st.sidebar.image(image_path, use_column_width=True)
 inp = st.sidebar.selectbox("**Data Operations**", ["Select Operation", 'Fetch Channel Data', 'View Channel Details', 'Migrate Data to MYSQL Warehouse',
                                    'MYSQL Query Results', 'Direct MySQL Query', 'Feedback'])
 st.sidebar.markdown(""":blue[Welcome to the ***YouTube Data Hub*** an all-in-one solution for harvesting, storing, and analyzing YouTube data. 
                     Use the options above to explore channel details, migrate data, query your database, and more.]""")
-
+# Frond page of my webapp
 if inp == 'Select Operation':
     st.title(":blue[***Welcome to Your YouTube Data Hub***]")
     st.markdown("""Welcome to our **YouTube Data Harvesting** application. Here, you can seamlessly fetch YouTube channel data, 
@@ -342,6 +344,8 @@ if inp == 'Select Operation':
                 \n- **Direct MySQL Query:** Write and execute custom MySQL queries.
                                 
                 \n***Please select an operation and get started with your data analysis journey!***""")
+    
+# Fetch Channel Data: Retrieve information about YouTube channels.
 elif inp == 'Fetch Channel Data':
     name = st.text_input('**Enter the Channel Name**')
     execute = st.button("Get Channel Details")
@@ -352,12 +356,13 @@ elif inp == 'Fetch Channel Data':
                     video IDs, video details, and comments associated with the channel's videos, all neatly organized in the MongoDB database.""")
     elif name and execute:
         with st.spinner('Please wait '):
-                data1=mongo(name)
+                data1=push_mongoDB(name)
                 if data1:
                     st.success('Done!, Data Fetched Successfully')
 
+# View Channel Details to see the details of the stored channels in MongoDB.
 elif inp == 'View Channel Details':
-    channelname = st.selectbox('select ChannelName', [i['channeldata']['ChannelName'] for i in col.find()])
+    channelname = st.selectbox('select ChannelName', [i['channeldata']['ChannelName'] for i in collection.find()])
     if channelname:
         query = {'channeldata.ChannelName':channelname}
         tab1, tab2, tab3, tab4, tab5 = st.tabs(['View Channel Details', 'ChannelDetails', 'VideoIdDetails', 'VideoDetails', 'CommentDetails'])
@@ -368,27 +373,25 @@ elif inp == 'View Channel Details':
                             video IDs, video details, and comments associated with that channel's videos**. Dive deep into the channel's content with ease.""")
         with tab2:
             st.header(':blue[Channel Details]')
-            for i in col.find(query):
+            for i in collection.find(query):
                 st.dataframe(i['channeldata'])
         with tab3:
             st.header(':blue[Video Id Details]')
-            for i in col.find(query):
+            for i in collection.find(query):
                 df6 = pd.DataFrame(i['videoiddata'])
             st.dataframe(df6.head(100))
         with tab4:
             st.header(':blue[Video Details]')
-            for i in col.find(query):
+            for i in collection.find(query):
                 df7 = pd.DataFrame(i['videodata'])
             st.dataframe(df7.head(500))
         with tab5:
             st.header(':blue[Comment Details]')
-            for i in col.find(query):
+            for i in collection.find(query):
                 df8 = pd.DataFrame(i['commentdata'])
             st.dataframe(df8.head(1000))
 
-
-
- 
+ # Transfer information from the MongoDB database to MySQL data warehouse.
 elif inp == 'Migrate Data to MYSQL Warehouse':
     mode = st.selectbox('Select the Method of Migration',["Select the Mode of Migration", "Default Migration", "Selective Migration"])
     if mode == 'Select the Mode of Migration':
@@ -401,7 +404,7 @@ elif inp == 'Migrate Data to MYSQL Warehouse':
         sql = st.button("Migrate Data")
     elif mode == "Selective Migration":
         sql = False
-        channelname = st.multiselect('select ChannelName', [i['channeldata']['ChannelName'] for i in col.find()])
+        channelname = st.multiselect('select ChannelName', [i['channeldata']['ChannelName'] for i in collection.find()])
         if channelname:
             query = {'channeldata.ChannelName':{'$in':channelname}}
             st.write('Click the below button to migrate records into MYSQL')
@@ -414,9 +417,10 @@ elif inp == 'Migrate Data to MYSQL Warehouse':
                      By seamlessly synchronizing databases, it ensures that your data is readily available for structured analysis and actionable insights.""")
     elif sql:
         with st.spinner('Please wait '):
-            merge = mergemysql(query)
+            merge = migrate_to_mysql(query)
             st.success('Done!, Data Migration Successfully')
 
+# MySQL query for 10 frequently asked questions.
 elif inp == 'MYSQL Query Results':
     question = st.selectbox("**Select Questions**",
                             ['Click the question that you would like to query',
@@ -439,102 +443,102 @@ elif inp == 'MYSQL Query Results':
     
     elif question == '1. What are the names of all the videos and their corresponding channels?':
         st.write(question)
-        curs.execute("""select channeldetails.ChannelName,  videodetails.VideoTitle from channeldetails INNER JOIN
+        mycursor.execute("""select channeldetails.ChannelName,  videodetails.VideoTitle from channeldetails INNER JOIN
                         playlistiddetails ON channeldetails.PlayListId=playlistiddetails.PlayListId INNER JOIN videodetails
                         ON videodetails.VideoId=playlistiddetails.VideoId;""")
-        data = curs.fetchall()
-        df = pd.DataFrame(data, columns = [i[0] for i in curs.description])
+        data = mycursor.fetchall()
+        df = pd.DataFrame(data, columns = [i[0] for i in mycursor.description])
         st.dataframe(df)
     elif question == '2. Which channels have the most number of videos, and how many videos do they have?':
         st.write(question)
-        curs.execute("""select ChannelName, VideoCount from ChannelDetails
+        mycursor.execute("""select ChannelName, VideoCount from ChannelDetails
                         where VideoCount=(select max(VideoCount)from ChannelDetails);""")
-        data = curs.fetchall()
-        df1 = pd.DataFrame(data, columns = [i[0] for i in curs.description])
+        data = mycursor.fetchall()
+        df1 = pd.DataFrame(data, columns = [i[0] for i in mycursor.description])
         st.dataframe(df1)
     elif question == '3. What are the top 10 most viewed videos and their respective channels?':
         st.write(question)
-        curs.execute("""select channeldetails.ChannelName, video.VideoTitle, video.Views from channeldetails INNER JOIN
+        mycursor.execute("""select channeldetails.ChannelName, video.VideoTitle, video.Views from channeldetails INNER JOIN
                         playlistiddetails ON channeldetails.PlayListId=playlistiddetails.PlayListId INNER JOIN (
                         select VideoTitle, Views, CommentCount,VideoId from videodetails ORDER BY Views desc LIMIT 10) video 
                         ON video.VideoId=playlistiddetails.VideoId ORDER BY Views desc;""")
 
-        data = curs.fetchall()
-        df3 = pd.DataFrame(data, columns = [i[0] for i in curs.description])
+        data = mycursor.fetchall()
+        df3 = pd.DataFrame(data, columns = [i[0] for i in mycursor.description])
         st.dataframe(df3)
     elif question == '4. How many comments were made on each video, and what are their corresponding video names?':
         st.write(question)
-        curs.execute("""select VideoTitle, Views, CommentCount from videodetails ORDER BY Views desc;""")
-        data = curs.fetchall()
-        df4 = pd.DataFrame(data, columns = [i[0] for i in curs.description])
+        mycursor.execute("""select VideoTitle, Views, CommentCount from videodetails ORDER BY Views desc;""")
+        data = mycursor.fetchall()
+        df4 = pd.DataFrame(data, columns = [i[0] for i in mycursor.description])
         st.dataframe(df4)
 
     elif question == '5. Which videos have the highest number of likes, and what are their corresponding channel names?':
         st.write(question)
-        curs.execute("""select channeldetails.ChannelName, video.VideoTitle, video.LikeCount from channeldetails INNER JOIN
+        mycursor.execute("""select channeldetails.ChannelName, video.VideoTitle, video.LikeCount from channeldetails INNER JOIN
                         playlistiddetails ON channeldetails.PlayListId=playlistiddetails.PlayListId INNER JOIN (
                         SELECT * FROM videodetails WHERE LikeCount=(SELECT max(LikeCount) FROM videodetails)) video ON 
                         video.VideoId=playlistiddetails.VideoId;""")
-        data = curs.fetchall()
-        df5 = pd.DataFrame(data, columns = [i[0] for i in curs.description])
+        data = mycursor.fetchall()
+        df5 = pd.DataFrame(data, columns = [i[0] for i in mycursor.description])
         st.dataframe(df5)
     elif question == '6. What is the total number of likes and dislikes for each video, and what are their corresponding video names?':
         st.write(question)
-        curs.execute("""SELECT VideoTitle, LikeCount, DislikeCount FROM videodetails;""")
-        data = curs.fetchall()
-        df6 = pd.DataFrame(data, columns = [i[0] for i in curs.description])
+        mycursor.execute("""SELECT VideoTitle, LikeCount, DislikeCount FROM videodetails;""")
+        data = mycursor.fetchall()
+        df6 = pd.DataFrame(data, columns = [i[0] for i in mycursor.description])
         st.dataframe(df6)
     elif question == '7. What is the total number of views for each channel, and what are their corresponding channel names?':
         st.write(question)
-        curs.execute("""select channeldetails.ChannelName, sum(videodetails.Views) as TotalViews from channeldetails inner join 
+        mycursor.execute("""select channeldetails.ChannelName, sum(videodetails.Views) as TotalViews from channeldetails inner join 
                         playlistiddetails on playlistiddetails.PlayListId= channeldetails.PlayListId inner join 
                         videodetails on videodetails.VideoId=playlistiddetails.VideoId group by ChannelName;""")
-        data = curs.fetchall()
-        df7 = pd.DataFrame(data, columns = [i[0] for i in curs.description])
+        data = mycursor.fetchall()
+        df7 = pd.DataFrame(data, columns = [i[0] for i in mycursor.description])
         df7['TotalViews'] = df7['TotalViews'].astype(int)
         st.dataframe(df7)
 
         # st.bar_chart(df7,x='ChannelName' , y='TotalViews') 
     elif question == '8. What are the names of all the channels that have published videos in the year 2022?':
         st.write(question)
-        curs.execute(""" SELECT DISTINCT channeldetails.ChannelName FROM channeldetails INNER JOIN playlistiddetails ON channeldetails.PlayListId = playlistiddetails.PlayListId
+        mycursor.execute(""" SELECT DISTINCT channeldetails.ChannelName FROM channeldetails INNER JOIN playlistiddetails ON channeldetails.PlayListId = playlistiddetails.PlayListId
                         INNER JOIN videodetails ON playlistiddetails.VideoId = videodetails.VideoId
                         WHERE YEAR(videodetails.PublishedAt) = 2022;""")
-        data = curs.fetchall()
-        df8 = pd.DataFrame(data, columns=[i[0] for i in curs.description])
+        data = mycursor.fetchall()
+        df8 = pd.DataFrame(data, columns=[i[0] for i in mycursor.description])
         st.dataframe(df8)
     elif question == '9. What is the average duration of all videos in each channel, and what are their corresponding channel names?':
         st.write(question) 
-        curs.execute("""select channeldetails.ChannelName, AVG(videodetails.Duration) as AverageDuration from channeldetails inner join
+        mycursor.execute("""select channeldetails.ChannelName, AVG(videodetails.Duration) as AverageDuration from channeldetails inner join
                         playlistiddetails on playlistiddetails.PlayListId= channeldetails.PlayListId inner join videodetails 
                         on videodetails.VideoId=playlistiddetails.VideoId group by channeldetails.ChannelName;""")
-        data = curs.fetchall()
-        df9 = pd.DataFrame(data, columns = [i[0] for i in curs.description])
+        data = mycursor.fetchall()
+        df9 = pd.DataFrame(data, columns = [i[0] for i in mycursor.description])
         st.dataframe(df9)   
         st.bar_chart(df9,x='ChannelName' , y='AverageDuration') 
     elif question == '10. Which videos have the highest number of comments, and what are their corresponding channel names?':
         st.write(question)
-        curs.execute("""select channeldetails.ChannelName, video.VideoTitle, video.CommentCount from channeldetails INNER JOIN
+        mycursor.execute("""select channeldetails.ChannelName, video.VideoTitle, video.CommentCount from channeldetails INNER JOIN
                         playlistiddetails ON channeldetails.PlayListId=playlistiddetails.PlayListId INNER JOIN (
                         SELECT VideoId,VideoTitle, CommentCount FROM videodetails where CommentCount =( select max(CommentCount) as max FROM 
                         videodetails)) video ON video.VideoId=playlistiddetails.VideoId;""")
-        data = curs.fetchall()
-        df10 = pd.DataFrame(data, columns = [i[0] for i in curs.description])
+        data = mycursor.fetchall()
+        df10 = pd.DataFrame(data, columns = [i[0] for i in mycursor.description])
         st.dataframe(df10) 
-
+# Direct MySQL Query
 elif inp == 'Direct MySQL Query':
     query = st.text_area('**Enter your own query**')
     query = query.lower()
     result = st.button( "Retrieve Data")
     if result == False:
-        curs.execute("DESCRIBE channeldetails")
-        data1 = curs.fetchall()
-        curs.execute("DESCRIBE playlistiddetails")
-        data2 = curs.fetchall()
-        curs.execute("DESCRIBE videodetails")
-        data3 = curs.fetchall()
-        curs.execute("show columns from commentdetails")
-        data4 = curs.fetchall()
+        mycursor.execute("DESCRIBE channeldetails")
+        data1 = mycursor.fetchall()
+        mycursor.execute("DESCRIBE playlistiddetails")
+        data2 = mycursor.fetchall()
+        mycursor.execute("DESCRIBE videodetails")
+        data3 = mycursor.fetchall()
+        mycursor.execute("show columns from commentdetails")
+        data4 = mycursor.fetchall()
         if st.button('Table Reference'):
             tab1, tab2, tab3, tab4 = st.tabs(['ChannelDetails','PlayListIdDetails','VideoDetails','CommentDetails'])
             st.write("""Refer to the below tables for guidance, where title is represented as the table name,
@@ -562,9 +566,9 @@ elif inp == 'Direct MySQL Query':
                      note that you have read-only access (DQL). Any attempt to perform other query types will result in an "Access Denied" message.""")
     elif query and result and 'select' in query:
         try:
-            curs.execute(query)
-            data = curs.fetchall() 
-            df = pd.DataFrame(data, columns = [i[0] for i in curs.description])
+            mycursor.execute(query)
+            data = mycursor.fetchall() 
+            df = pd.DataFrame(data, columns = [i[0] for i in mycursor.description])
             st.dataframe(df)
         except Exception as e:
             st.write(e)
@@ -572,6 +576,7 @@ elif inp == 'Direct MySQL Query':
             st.write('Please review your query and check for any syntax or logic errors.')
     elif query and result and 'select' not in query:
         st.warning('Access Denied', icon="⚠️")
+# Feedback
 elif inp == 'Feedback':
     st.header(':blue[***Feedback Form***]')
     FName = st.text_input('**Enter your First Name**')
@@ -582,8 +587,8 @@ elif inp == 'Feedback':
     if FName and LName and Mobile and Feedback:
         data = {'First_Name':FName, 'Last_Name':LName, 'Mobile Number':Mobile, 'Feedback': Feedback, 'PublishedAt':dt.now()}
         if submit and data:
-            coll = dbnew.Feedback
-            coll.insert_one(data)
+            collection = database.Feedback
+            collection.insert_one(data)
             st.success("Thank you for your feedback!")
         else:
             st.warning("Please enter your feedback before submitting.")
