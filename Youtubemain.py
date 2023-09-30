@@ -330,7 +330,7 @@ inp = st.sidebar.selectbox("**Data Operations**", ["Select Operation", 'Fetch Ch
                                    'MYSQL Query Results', 'Direct MySQL Query', 'Feedback'])
 st.sidebar.markdown(""":blue[Welcome to the ***YouTube Data Hub*** an all-in-one solution for harvesting, storing, and analyzing YouTube data. 
                     Use the options above to explore channel details, migrate data, query your database, and more.]""")
-# Frond page of my webapp
+# Front page of my webapp
 if inp == 'Select Operation':
     st.title(":blue[***Welcome to Your YouTube Data Hub***]")
     st.markdown("""Welcome to our **YouTube Data Harvesting** application. Here, you can seamlessly fetch YouTube channel data, 
